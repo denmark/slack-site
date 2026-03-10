@@ -102,6 +102,8 @@ type MessageUserProfile struct {
 	IsUltraRestricted bool `json:"is_ultra_restricted"`
 }
 
+// Message blocks (Slack Block Kit). Stored as raw interface slice so we can walk
+// rich_text blocks and render to HTML without defining every block/element type.
 type Message struct {
 	User        string              `json:"user"`
 	Type        string              `json:"type"`
@@ -112,7 +114,7 @@ type Message struct {
 	UserTeam    string              `json:"user_team"`
 	SourceTeam  string              `json:"source_team"`
 	UserProfile *MessageUserProfile `json:"user_profile"`
-	// Blocks and other fields omitted for brevity; can add if needed
+	Blocks      []interface{}       `json:"blocks"`
 }
 
 // Normalized database table models (Bun)

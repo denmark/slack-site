@@ -49,7 +49,8 @@ func slackIndexMapping() *mapping.IndexMappingImpl {
 }
 
 // SearchDocumentForMessage returns a search document for a message (for batch or single index).
-func SearchDocumentForMessage(conversationID, conversationType, ts string, msg *models.Message) *models.SearchDocument {
+// text is the message body to index (e.g. HTML-rendered from rich_text blocks or plain msg.Text).
+func SearchDocumentForMessage(conversationID, conversationType, ts string, msg *models.Message, text string) *models.SearchDocument {
 	name := ""
 	if msg.UserProfile != nil {
 		name = msg.UserProfile.Name
@@ -61,15 +62,15 @@ func SearchDocumentForMessage(conversationID, conversationType, ts string, msg *
 		UserID:           msg.User,
 		Type:             msg.Type,
 		Ts:               msg.Ts,
-		Text:             msg.Text,
+		Text:             text,
 		UserProfileName:  name,
 		Team:             msg.Team,
 	}
 }
 
-// IndexMessage indexes a single message document.
-func IndexMessage(idx bleve.Index, conversationID, conversationType, ts string, msg *models.Message) error {
-	doc := SearchDocumentForMessage(conversationID, conversationType, ts, msg)
+// IndexMessage indexes a single message document. text is the message body (e.g. HTML-rendered).
+func IndexMessage(idx bleve.Index, conversationID, conversationType, ts string, msg *models.Message, text string) error {
+	doc := SearchDocumentForMessage(conversationID, conversationType, ts, msg, text)
 	return idx.Index(doc.ID, doc)
 }
 

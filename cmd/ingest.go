@@ -11,6 +11,7 @@ import (
 	"github.com/blevesearch/bleve/v2"
 	"github.com/denmark/slack-site/db"
 	"github.com/denmark/slack-site/models"
+	"github.com/denmark/slack-site/msghtml"
 	"github.com/denmark/slack-site/search"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/bun"
@@ -352,6 +353,7 @@ func ingestMessages(ctx context.Context, database *bun.DB, idx bleve.Index, inpu
 				return err
 			}
 			for _, msg := range messages {
+				msgText := msghtml.Render(&msg)
 				userProfileName := ""
 				if msg.UserProfile != nil {
 					userProfileName = msg.UserProfile.Name
@@ -363,13 +365,13 @@ func ingestMessages(ctx context.Context, database *bun.DB, idx bleve.Index, inpu
 					Type:             msg.Type,
 					Ts:               msg.Ts,
 					ClientMsgID:      msg.ClientMsgID,
-					Text:             msg.Text,
+					Text:             msgText,
 					UserProfileName:  userProfileName,
 					Team:             msg.Team,
 					UserTeam:         msg.UserTeam,
 					SourceTeam:       msg.SourceTeam,
 				})
-				searchDocs = append(searchDocs, search.SearchDocumentForMessage(info.id, info.ctype, msg.Ts, &msg))
+				searchDocs = append(searchDocs, search.SearchDocumentForMessage(info.id, info.ctype, msg.Ts, &msg, msgText))
 				if len(messageRows) >= dbBatchSize {
 					if err := flushMessages(); err != nil {
 						return err
