@@ -70,5 +70,19 @@ func createSchema(db *bun.DB) error {
 	if err != nil {
 		return err
 	}
+	_, err = db.NewCreateTable().Model((*models.MessageFileRow)(nil)).Exec(ctx)
+	if err != nil {
+		return err
+	}
+	// Unique index so message_files.message_conversation_id + message_ts can reference a single message
+	_, err = db.NewCreateIndex().Model((*models.MessageRow)(nil)).Index("idx_messages_conversation_ts").Column("conversation_id", "ts").Unique().Exec(ctx)
+	if err != nil {
+		return err
+	}
+	// Unique index so duplicate file attachments are skipped when the same message is seen again
+	_, err = db.NewCreateIndex().Model((*models.MessageFileRow)(nil)).Index("idx_message_files_message_file").Column("message_conversation_id", "message_ts", "slack_file_id").Unique().Exec(ctx)
+	if err != nil {
+		return err
+	}
 	return nil
 }

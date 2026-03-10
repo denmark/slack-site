@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	dbBatchSize       = 2000 // Bun bulk insert chunk size
-	bleveBatchSize    = 500  // Bleve batch index size (recommended 100-1000)
+	dbBatchSize       = 2000  // Bun bulk insert chunk size
+	bleveBatchSize    = 500   // Bleve batch index size (recommended 100-1000)
 	messageProgressAt = 50000 // Print message progress every N messages
 )
 
@@ -43,7 +43,7 @@ func init() {
 }
 
 type convInfo struct {
-	id   string
+	id    string
 	ctype string
 }
 
@@ -299,16 +299,24 @@ func ingestMPIMs(ctx context.Context, database *bun.DB, inputDir string, convMap
 func ingestMessages(ctx context.Context, database *bun.DB, idx bleve.Index, inputDir string, convMap map[string]convInfo) error {
 	messageRows := make([]models.MessageRow, 0, dbBatchSize)
 	searchDocs := make([]*models.SearchDocument, 0, bleveBatchSize)
-	var totalMessages int64
+	fileRows := make([]models.MessageFileRow, 0, dbBatchSize) // files for messages in current batch
+	var totalMessages, totalFiles int64
 
 	flushMessages := func() error {
 		if len(messageRows) == 0 {
 			return nil
 		}
-		if _, err := database.NewInsert().Model(&messageRows).Exec(ctx); err != nil {
+		if _, err := database.NewInsert().Model(&messageRows).Ignore().Exec(ctx); err != nil {
 			return err
 		}
 		totalMessages += int64(len(messageRows))
+		if len(fileRows) > 0 {
+			totalFiles += int64(len(fileRows))
+			if _, err := database.NewInsert().Model(&fileRows).Ignore().Exec(ctx); err != nil {
+				return err
+			}
+			fileRows = fileRows[:0]
+		}
 		messageRows = messageRows[:0]
 		return nil
 	}
@@ -372,6 +380,18 @@ func ingestMessages(ctx context.Context, database *bun.DB, idx bleve.Index, inpu
 					SourceTeam:       msg.SourceTeam,
 				})
 				searchDocs = append(searchDocs, search.SearchDocumentForMessage(info.id, info.ctype, msg.Ts, &msg, msgText))
+				for _, f := range msg.Files {
+					fileRows = append(fileRows, models.MessageFileRow{
+						MessageConversationID: info.id,
+						MessageTs:             msg.Ts,
+						SlackFileID:           f.ID,
+						URLPrivate:            f.URLPrivate,
+						Name:                  f.Name,
+						Mimetype:              f.Mimetype,
+						Filetype:              f.Filetype,
+						Size:                  f.Size,
+					})
+				}
 				if len(messageRows) >= dbBatchSize {
 					if err := flushMessages(); err != nil {
 						return err
@@ -401,6 +421,6 @@ func ingestMessages(ctx context.Context, database *bun.DB, idx bleve.Index, inpu
 	if err := flushBleve(); err != nil {
 		return err
 	}
-	fmt.Printf("  messages: %d\n", totalMessages)
+	fmt.Printf("  messages: %d, message files: %d\n", totalMessages, totalFiles)
 	return nil
 }
