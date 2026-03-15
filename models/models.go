@@ -114,20 +114,26 @@ type MessageFile struct {
 	URLPrivate string `json:"url_private"`
 }
 
+// MessageAttachment is an attachment on a message (Slack export attachments[] element). We only store the "text" key.
+type MessageAttachment struct {
+	Text string `json:"text"`
+}
+
 // Message blocks (Slack Block Kit). Stored as raw interface slice so we can walk
 // rich_text blocks and render to HTML without defining every block/element type.
 type Message struct {
-	User        string              `json:"user"`
-	Type        string              `json:"type"`
-	Ts          string              `json:"ts"`
-	ClientMsgID string              `json:"client_msg_id"`
-	Text        string              `json:"text"`
-	Team        string              `json:"team"`
-	UserTeam    string              `json:"user_team"`
-	SourceTeam  string              `json:"source_team"`
-	UserProfile *MessageUserProfile `json:"user_profile"`
-	Blocks      []interface{}       `json:"blocks"`
-	Files       []MessageFile       `json:"files"`
+	User        string                `json:"user"`
+	Type        string                `json:"type"`
+	Ts          string                `json:"ts"`
+	ClientMsgID string                `json:"client_msg_id"`
+	Text        string                `json:"text"`
+	Team        string                `json:"team"`
+	UserTeam    string                `json:"user_team"`
+	SourceTeam  string                `json:"source_team"`
+	UserProfile *MessageUserProfile   `json:"user_profile"`
+	Blocks      []interface{}         `json:"blocks"`
+	Files       []MessageFile         `json:"files"`
+	Attachments []MessageAttachment   `json:"attachments"`
 }
 
 // Normalized database table models (Bun)
@@ -251,6 +257,17 @@ type MessageFileRow struct {
 	Mimetype              string `bun:"mimetype"`
 	Filetype              string `bun:"filetype"`
 	Size                  int64  `bun:"size"`
+}
+
+// MessageAttachmentRow stores an attachment on a message. Foreign key: (message_conversation_id, message_ts) references messages(conversation_id, ts).
+// Only the attachment "text" from the JSON is stored. Position is the 0-based index in the message's attachments array (for deduplication).
+type MessageAttachmentRow struct {
+	bun.BaseModel          `bun:"table:message_attachments"`
+	ID                     int64  `bun:"id,autoincrement,pk"`
+	MessageConversationID  string `bun:"message_conversation_id"`
+	MessageTs              string `bun:"message_ts"`
+	Position               int    `bun:"position"` // 0-based index in attachments[]
+	Text                   string `bun:"text"`
 }
 
 // SearchDocument is the shape of a document indexed in Bleve (includes user_profile name for mapping)

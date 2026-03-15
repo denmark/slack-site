@@ -84,5 +84,14 @@ func createSchema(db *bun.DB) error {
 	if err != nil {
 		return err
 	}
+	_, err = db.NewCreateTable().Model((*models.MessageAttachmentRow)(nil)).Exec(ctx)
+	if err != nil {
+		return err
+	}
+	// Unique index so duplicate attachment rows are skipped when the same message is seen again
+	_, err = db.NewCreateIndex().Model((*models.MessageAttachmentRow)(nil)).Index("idx_message_attachments_message_pos").Column("message_conversation_id", "message_ts", "position").Unique().Exec(ctx)
+	if err != nil {
+		return err
+	}
 	return nil
 }

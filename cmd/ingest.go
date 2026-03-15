@@ -299,8 +299,9 @@ func ingestMPIMs(ctx context.Context, database *bun.DB, inputDir string, convMap
 func ingestMessages(ctx context.Context, database *bun.DB, idx bleve.Index, inputDir string, convMap map[string]convInfo) error {
 	messageRows := make([]models.MessageRow, 0, dbBatchSize)
 	searchDocs := make([]*models.SearchDocument, 0, bleveBatchSize)
-	fileRows := make([]models.MessageFileRow, 0, dbBatchSize) // files for messages in current batch
-	var totalMessages, totalFiles int64
+	fileRows := make([]models.MessageFileRow, 0, dbBatchSize)
+	attachmentRows := make([]models.MessageAttachmentRow, 0, dbBatchSize)
+	var totalMessages, totalFiles, totalAttachments int64
 
 	flushMessages := func() error {
 		if len(messageRows) == 0 {
@@ -316,6 +317,13 @@ func ingestMessages(ctx context.Context, database *bun.DB, idx bleve.Index, inpu
 				return err
 			}
 			fileRows = fileRows[:0]
+		}
+		if len(attachmentRows) > 0 {
+			totalAttachments += int64(len(attachmentRows))
+			if _, err := database.NewInsert().Model(&attachmentRows).Ignore().Exec(ctx); err != nil {
+				return err
+			}
+			attachmentRows = attachmentRows[:0]
 		}
 		messageRows = messageRows[:0]
 		return nil
@@ -392,6 +400,14 @@ func ingestMessages(ctx context.Context, database *bun.DB, idx bleve.Index, inpu
 						Size:                  f.Size,
 					})
 				}
+				for i, a := range msg.Attachments {
+					attachmentRows = append(attachmentRows, models.MessageAttachmentRow{
+						MessageConversationID: info.id,
+						MessageTs:             msg.Ts,
+						Position:              i,
+						Text:                  a.Text,
+					})
+				}
 				if len(messageRows) >= dbBatchSize {
 					if err := flushMessages(); err != nil {
 						return err
@@ -421,6 +437,6 @@ func ingestMessages(ctx context.Context, database *bun.DB, idx bleve.Index, inpu
 	if err := flushBleve(); err != nil {
 		return err
 	}
-	fmt.Printf("  messages: %d, message files: %d\n", totalMessages, totalFiles)
+	fmt.Printf("  messages: %d, message files: %d, message attachments: %d\n", totalMessages, totalFiles, totalAttachments)
 	return nil
 }
