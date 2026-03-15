@@ -406,6 +406,7 @@ func ingestMessages(ctx context.Context, database *bun.DB, idx bleve.Index, inpu
 						MessageTs:             msg.Ts,
 						Position:              i,
 						Text:                  a.Text,
+						Pretext:               a.Pretext,
 					})
 				}
 				if len(messageRows) >= dbBatchSize {

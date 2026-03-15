@@ -114,9 +114,10 @@ type MessageFile struct {
 	URLPrivate string `json:"url_private"`
 }
 
-// MessageAttachment is an attachment on a message (Slack export attachments[] element). We only store the "text" key.
+// MessageAttachment is an attachment on a message (Slack export attachments[] element). We store "text" and "pretext".
 type MessageAttachment struct {
-	Text string `json:"text"`
+	Text    string `json:"text"`
+	Pretext string `json:"pretext"`
 }
 
 // Message blocks (Slack Block Kit). Stored as raw interface slice so we can walk
@@ -260,7 +261,7 @@ type MessageFileRow struct {
 }
 
 // MessageAttachmentRow stores an attachment on a message. Foreign key: (message_conversation_id, message_ts) references messages(conversation_id, ts).
-// Only the attachment "text" from the JSON is stored. Position is the 0-based index in the message's attachments array (for deduplication).
+// Stores the attachment "text" and "pretext" from the JSON. Position is the 0-based index in the message's attachments array (for deduplication).
 type MessageAttachmentRow struct {
 	bun.BaseModel          `bun:"table:message_attachments"`
 	ID                     int64  `bun:"id,autoincrement,pk"`
@@ -268,6 +269,7 @@ type MessageAttachmentRow struct {
 	MessageTs              string `bun:"message_ts"`
 	Position               int    `bun:"position"` // 0-based index in attachments[]
 	Text                   string `bun:"text"`
+	Pretext                string `bun:"pretext"`
 }
 
 // SearchDocument is the shape of a document indexed in Bleve (includes user_profile name for mapping)
