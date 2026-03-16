@@ -1,0 +1,31 @@
+{{define "search_content"}}
+<h1 class="text-2xl font-bold text-slate-800 mb-4">Search</h1>
+<form method="get" action="/search" class="mb-6 flex gap-2">
+  <input type="search" name="q" value="{{.Query}}" placeholder="Search messages…" class="flex-1 rounded-lg border border-slate-300 px-4 py-2 focus:border-sky-500 focus:ring-1 focus:ring-sky-500">
+  <button type="submit" class="rounded-lg bg-sky-600 px-4 py-2 text-white font-medium hover:bg-sky-700">Search</button>
+</form>
+{{if .Query}}
+<p class="text-slate-600 mb-4">{{.Total}} result(s)</p>
+{{if .Results}}
+<div class="space-y-4">
+  {{range .Results}}
+  <div class="bg-white rounded-lg border border-slate-200 px-4 py-3 shadow-sm">
+    <div class="text-sm text-slate-600 mb-1">
+      {{if .UserName}}{{.UserName}} · {{end}}
+      <a href="/{{.ConversationType}}s/{{.ConversationID}}" class="text-sky-600 hover:underline">{{.ConversationID}}</a>
+    </div>
+    <div class="text-slate-800">{{safeHTML .Snippet}}</div>
+    <a href="/{{.ConversationType}}s/{{.ConversationID}}" class="text-sm text-sky-600 hover:underline mt-2 inline-block">View conversation</a>
+  </div>
+  {{end}}
+</div>
+{{if .HasMore}}
+<p class="mt-4">
+  <a href="/search?q={{.Query}}&page={{.NextPage}}" class="text-sky-600 hover:underline">Next page</a>
+</p>
+{{end}}
+{{else}}
+<p class="text-slate-600">No results.</p>
+{{end}}
+{{end}}
+{{end}}

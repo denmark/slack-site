@@ -25,6 +25,17 @@ func NewIndex(outputDir string) (bleve.Index, error) {
 	return bleve.New(path, mapping)
 }
 
+// OpenExisting opens an existing Bleve index at the given path (e.g. outputDir/slack.bleve from ingest).
+func OpenExisting(path string) (bleve.Index, error) {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("index not found: %s (run ingest first)", path)
+		}
+		return nil, fmt.Errorf("stat index: %w", err)
+	}
+	return bleve.Open(path)
+}
+
 // slackIndexMapping builds an index mapping that includes the "name" field of user_profile (indexed and searchable).
 func slackIndexMapping() *mapping.IndexMappingImpl {
 	idxMapping := bleve.NewIndexMapping()
@@ -108,10 +119,18 @@ func Close(idx bleve.Index) error {
 
 // Search runs a query string against the index (helper).
 func Search(idx bleve.Index, q string, from, size int) (*bleve.SearchResult, error) {
+	return SearchWithFields(idx, q, from, size, nil)
+}
+
+// SearchWithFields runs a query and returns hits with the given fields populated (e.g. conversation_id, ts, text).
+func SearchWithFields(idx bleve.Index, q string, from, size int, fields []string) (*bleve.SearchResult, error) {
 	if idx == nil {
 		return nil, fmt.Errorf("index is nil")
 	}
 	query := bleve.NewQueryStringQuery(q)
 	req := bleve.NewSearchRequestOptions(query, size, from, false)
+	if len(fields) > 0 {
+		req.Fields = fields
+	}
 	return idx.Search(req)
 }

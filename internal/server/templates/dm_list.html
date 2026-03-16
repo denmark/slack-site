@@ -1,0 +1,23 @@
+{{define "dm_list_content"}}
+<h1 class="text-2xl font-bold text-slate-800 mb-4">Direct messages</h1>
+<div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+  <table class="min-w-full divide-y divide-slate-200">
+    <thead class="bg-slate-50">
+      <tr>
+        <th class="px-4 py-3 text-left text-sm font-medium text-slate-700">DM ID</th>
+        <th class="px-4 py-3 text-left text-sm font-medium text-slate-700">Members</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-200">
+      {{range .DMs}}
+      <tr class="hover:bg-slate-50">
+        <td class="px-4 py-3">
+          <a href="/dms/{{.ID}}" class="text-sky-600 font-medium hover:underline">{{.ID}}</a>
+        </td>
+        <td class="px-4 py-3 text-slate-600">{{.MemberCount}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}

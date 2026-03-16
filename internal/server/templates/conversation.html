@@ -1,0 +1,27 @@
+{{define "conversation_content"}}
+<div class="mb-4 flex items-center justify-between">
+  <h1 class="text-2xl font-bold text-slate-800">{{.ConversationName}}</h1>
+  {{if .HasOlder}}
+  <a href="/{{.ConversationType}}s/{{.ConversationID}}" class="text-sky-600 hover:underline text-sm">First page</a>
+  {{end}}
+</div>
+<div class="space-y-4">
+  {{range .Messages}}
+  <div class="bg-white rounded-lg border border-slate-200 px-4 py-3 shadow-sm">
+    <div class="flex items-baseline gap-2 text-sm text-slate-600 mb-1">
+      <span class="font-medium text-slate-800">{{.UserProfileName}}</span>
+      <span>{{.Ts}}</span>
+    </div>
+    <div class="text-slate-800 prose prose-slate max-w-none">{{safeHTML .Text}}</div>
+  </div>
+  {{end}}
+</div>
+<div class="mt-6 flex gap-4">
+  {{if .HasOlder}}
+  <a href="/{{.ConversationType}}s/{{.ConversationID}}" class="text-sky-600 hover:underline">First page</a>
+  {{end}}
+  {{if .HasNewer}}
+  <a href="/{{.ConversationType}}s/{{.ConversationID}}?after={{.NewerAfter}}" class="text-sky-600 hover:underline">Next (newer) messages</a>
+  {{end}}
+</div>
+{{end}}
