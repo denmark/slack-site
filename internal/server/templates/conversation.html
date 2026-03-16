@@ -13,6 +13,22 @@
       <span>{{formatTs .Ts}}</span>
     </div>
     <div class="text-slate-800 prose prose-slate max-w-none">{{safeHTML .Text}}</div>
+    {{$files := index $.MessageFiles .Ts}}{{if $files}}
+    <div class="mt-3 space-y-2">
+      {{range $files}}
+      {{if .URLPrivate}}
+      {{if mimeIsInline .Mimetype}}
+      <div class="inline-block max-w-full">
+        <img src="{{.URLPrivate}}" alt="{{.Name}}" class="max-h-96 max-w-full rounded border border-slate-200" loading="lazy" />
+        {{if .Name}}<p class="text-xs text-slate-500 mt-1">{{.Name}}</p>{{end}}
+      </div>
+      {{else}}
+      <a href="{{.URLPrivate}}" download="{{.Name}}" class="inline-flex items-center text-sky-600 hover:underline text-sm">{{.Name}}</a>
+      {{end}}
+      {{end}}
+      {{end}}
+    </div>
+    {{end}}
     <div class="text-right text-xs text-slate-400 mt-2">msg:{{.ID}} ts:{{.Ts}}</div>
   </div>
   {{end}}

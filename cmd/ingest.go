@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	dbBatchSize       = 5000  // Bun bulk insert chunk size
+	dbBatchSize       = 2000  // Bun bulk insert chunk size
 	bleveBatchSize    = 500   // Bleve batch index size (recommended 100-1000)
 	messageProgressAt = 50000 // Print message progress every N messages
 )

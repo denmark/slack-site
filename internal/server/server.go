@@ -46,8 +46,9 @@ type Server struct {
 func New(db *bun.DB, idx bleve.Index, templateDir string) (*Server, error) {
 	s := &Server{DB: db, Index: idx}
 	funcs := template.FuncMap{
-		"safeHTML": func(s string) template.HTML { return template.HTML(s) },
-		"formatTs":  formatTs,
+		"safeHTML":     func(s string) template.HTML { return template.HTML(s) },
+		"formatTs":     formatTs,
+		"mimeIsInline": mimeIsInline,
 	}
 	if templateDir != "" {
 		tmpl, err := template.New("").Funcs(funcs).ParseGlob(filepath.Join(templateDir, "*.html"))
@@ -267,12 +268,30 @@ func (s *Server) handleConversation(convType string) http.HandlerFunc {
 		if len(messages) > 0 {
 			nextAfter = messages[len(messages)-1].Ts
 		}
+		// Load message_files for this page of messages (conversation_id, message_ts)
+		messageFiles := make(map[string][]models.MessageFileRow)
+		if len(messages) > 0 {
+			tsList := make([]string, 0, len(messages))
+			for _, m := range messages {
+				tsList = append(tsList, m.Ts)
+			}
+			var files []models.MessageFileRow
+			err := s.DB.NewSelect().Model(&files).
+				Where("message_conversation_id = ? AND message_ts IN (?)", id, bun.In(tsList)).
+				Scan(ctx)
+			if err == nil {
+				for _, f := range files {
+					messageFiles[f.MessageTs] = append(messageFiles[f.MessageTs], f)
+				}
+			}
+		}
 		data := map[string]interface{}{
 			"Title":            convName,
 			"ConversationID":   id,
 			"ConversationType": convType,
 			"ConversationName": convName,
 			"Messages":         messages,
+			"MessageFiles":     messageFiles,
 			"HasNewer":         hasMore,
 			"NewerAfter":       nextAfter,
 			"HasOlder":         afterTs != "",
@@ -371,6 +390,11 @@ func (s *Server) executeSearchPage(w http.ResponseWriter, data map[string]interf
 func parseInt(s string) (int, bool) {
 	n, err := strconv.Atoi(s)
 	return n, err == nil && n > 0
+}
+
+// mimeIsInline returns true for mimetypes that should be displayed inline (e.g. images) rather than as download links.
+func mimeIsInline(mimetype string) bool {
+	return strings.HasPrefix(strings.ToLower(mimetype), "image/")
 }
 
 // formatTs formats a Slack timestamp (UTC epoch string, e.g. "1234567890.123456") as "January 2, 2006 at 3:04 PM" in the server's local timezone.
