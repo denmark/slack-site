@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/denmark/slack-site/models"
@@ -46,6 +47,7 @@ func New(db *bun.DB, idx bleve.Index, templateDir string) (*Server, error) {
 	s := &Server{DB: db, Index: idx}
 	funcs := template.FuncMap{
 		"safeHTML": func(s string) template.HTML { return template.HTML(s) },
+		"formatTs":  formatTs,
 	}
 	if templateDir != "" {
 		tmpl, err := template.New("").Funcs(funcs).ParseGlob(filepath.Join(templateDir, "*.html"))
@@ -369,6 +371,33 @@ func (s *Server) executeSearchPage(w http.ResponseWriter, data map[string]interf
 func parseInt(s string) (int, bool) {
 	n, err := strconv.Atoi(s)
 	return n, err == nil && n > 0
+}
+
+// formatTs formats a Slack timestamp (UTC epoch string, e.g. "1234567890.123456") as "January 2, 2006 at 3:04 PM" in the server's local timezone.
+func formatTs(ts interface{}) string {
+	var s string
+	switch v := ts.(type) {
+	case string:
+		s = v
+	case nil:
+		return ""
+	default:
+		return ""
+	}
+	if s == "" {
+		return ""
+	}
+	// Slack ts is "seconds.microseconds"; parse the integer part
+	secStr := s
+	if i := strings.Index(s, "."); i >= 0 {
+		secStr = s[:i]
+	}
+	sec, err := strconv.ParseInt(secStr, 10, 64)
+	if err != nil {
+		return s
+	}
+	t := time.Unix(sec, 0).Local()
+	return t.Format("January 2, 2006 at 3:04 PM")
 }
 
 // splitDocID splits Bleve doc ID "conversationID_ts" into conversation ID and ts (ts may contain decimals).
