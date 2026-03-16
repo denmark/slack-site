@@ -27,6 +27,21 @@ func Open(path string) (*bun.DB, error) {
 	return db, nil
 }
 
+// OpenReadOnly opens an existing SQLite database at path for read-only access. The file must already exist (e.g. created by ingest).
+func OpenReadOnly(path string) (*bun.DB, error) {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("database not found: %s (run ingest first)", path)
+		}
+		return nil, fmt.Errorf("stat database: %w", err)
+	}
+	sqldb, err := sql.Open(sqliteshim.ShimName, "file:"+path+"?cache=shared&mode=ro")
+	if err != nil {
+		return nil, fmt.Errorf("sql open: %w", err)
+	}
+	return bun.NewDB(sqldb, sqlitedialect.New()), nil
+}
+
 func createSchema(db *bun.DB) error {
 	ctx := context.Background()
 	// Create tables in dependency order
