@@ -17,6 +17,8 @@ import (
 	"github.com/uptrace/bun"
 )
 
+// TODO: re-factor these to a common place
+// TODO: make slack.db and slack.bleve into common constants
 const (
 	dbBatchSize       = 2000  // Bun bulk insert chunk size
 	bleveBatchSize    = 500   // Bleve batch index size (recommended 100-1000)
@@ -387,7 +389,7 @@ func ingestMessages(ctx context.Context, database *bun.DB, idx bleve.Index, inpu
 					UserTeam:         msg.UserTeam,
 					SourceTeam:       msg.SourceTeam,
 				})
-				searchDocs = append(searchDocs, search.SearchDocumentForMessage(info.id, info.ctype, msg.Ts, &msg, msgText))
+				searchDocs = append(searchDocs, search.SearchDocumentForMessage(info.id, msg.Ts, &msg, msgText))
 				for _, f := range msg.Files {
 					fileRows = append(fileRows, models.MessageFileRow{
 						MessageConversationID: info.id,

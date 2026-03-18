@@ -123,18 +123,18 @@ type MessageAttachment struct {
 // Message blocks (Slack Block Kit). Stored as raw interface slice so we can walk
 // rich_text blocks and render to HTML without defining every block/element type.
 type Message struct {
-	User        string                `json:"user"`
-	Type        string                `json:"type"`
-	Ts          string                `json:"ts"`
-	ClientMsgID string                `json:"client_msg_id"`
-	Text        string                `json:"text"`
-	Team        string                `json:"team"`
-	UserTeam    string                `json:"user_team"`
-	SourceTeam  string                `json:"source_team"`
-	UserProfile *MessageUserProfile   `json:"user_profile"`
-	Blocks      []interface{}         `json:"blocks"`
-	Files       []MessageFile         `json:"files"`
-	Attachments []MessageAttachment   `json:"attachments"`
+	User        string              `json:"user"`
+	Type        string              `json:"type"`
+	Ts          string              `json:"ts"`
+	ClientMsgID string              `json:"client_msg_id"`
+	Text        string              `json:"text"`
+	Team        string              `json:"team"`
+	UserTeam    string              `json:"user_team"`
+	SourceTeam  string              `json:"source_team"`
+	UserProfile *MessageUserProfile `json:"user_profile"`
+	Blocks      []interface{}       `json:"blocks"`
+	Files       []MessageFile       `json:"files"`
+	Attachments []MessageAttachment `json:"attachments"`
 }
 
 // Normalized database table models (Bun)
@@ -263,24 +263,22 @@ type MessageFileRow struct {
 // MessageAttachmentRow stores an attachment on a message. Foreign key: (message_conversation_id, message_ts) references messages(conversation_id, ts).
 // Stores the attachment "text" and "pretext" from the JSON. Position is the 0-based index in the message's attachments array (for deduplication).
 type MessageAttachmentRow struct {
-	bun.BaseModel          `bun:"table:message_attachments"`
-	ID                     int64  `bun:"id,autoincrement,pk"`
-	MessageConversationID  string `bun:"message_conversation_id"`
-	MessageTs              string `bun:"message_ts"`
-	Position               int    `bun:"position"` // 0-based index in attachments[]
-	Text                   string `bun:"text"`
-	Pretext                string `bun:"pretext"`
+	bun.BaseModel         `bun:"table:message_attachments"`
+	ID                    int64  `bun:"id,autoincrement,pk"`
+	MessageConversationID string `bun:"message_conversation_id"`
+	MessageTs             string `bun:"message_ts"`
+	Position              int    `bun:"position"` // 0-based index in attachments[]
+	Text                  string `bun:"text"`
+	Pretext               string `bun:"pretext"`
 }
 
 // SearchDocument is the shape of a document indexed in Bleve (includes user_profile name for mapping)
 type SearchDocument struct {
-	ID               string `json:"id"`
-	ConversationID   string `json:"conversation_id"`
-	ConversationType string `json:"conversation_type"`
-	UserID           string `json:"user_id"`
-	Type             string `json:"type"`
-	Ts               string `json:"ts"`
-	Text             string `json:"text"`
-	UserProfileName  string `json:"name"` // Bleve mapping: "name" field of user_profile
-	Team             string `json:"team"`
+	ID              string `json:"id"`
+	ConversationID  string `json:"conversation_id"`
+	UserID          string `json:"user_id"`
+	Ts              string `json:"ts"`
+	Text            string `json:"text"`
+	UserProfileName string `json:"name"` // Bleve mapping: "name" field of user_profile
+	Team            string `json:"team"`
 }

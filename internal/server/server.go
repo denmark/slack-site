@@ -323,7 +323,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	from := page * searchPageSize
-	result, err := search.SearchWithFields(s.Index, q, from, searchPageSize+1, []string{"conversation_id", "conversation_type", "ts", "text", "name"})
+	result, err := search.SearchWithFields(s.Index, q, from, searchPageSize+1, []string{"conversation_id", "ts", "text", "name"})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -342,9 +342,6 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			if v, _ := f["conversation_id"].(string); v != "" {
 				sh.ConversationID = v
 			}
-			if v, _ := f["conversation_type"].(string); v != "" {
-				sh.ConversationType = v
-			}
 			if v, _ := f["ts"].(string); v != "" {
 				sh.Ts = v
 			}
@@ -355,6 +352,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 				sh.UserName = v
 			}
 		}
+		sh.ConversationType = inferConvType(sh.ConversationID)
 		searchHits = append(searchHits, sh)
 	}
 	nextPage := 0
@@ -422,6 +420,23 @@ func formatTs(ts interface{}) string {
 	}
 	t := time.Unix(sec, 0).Local()
 	return t.Format("January 2, 2006 at 3:04 PM")
+}
+
+// inferConvType returns the conversation type from a Slack conversation ID prefix (C=channel, G=group, D=dm, else mpim).
+func inferConvType(convID string) string {
+	if convID == "" {
+		return "channel"
+	}
+	switch convID[0] {
+	case 'C':
+		return "channel"
+	case 'G':
+		return "group"
+	case 'D':
+		return "dm"
+	default:
+		return "mpim"
+	}
 }
 
 // splitDocID splits Bleve doc ID "conversationID_ts" into conversation ID and ts (ts may contain decimals).
