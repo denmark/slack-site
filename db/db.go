@@ -12,8 +12,12 @@ import (
 	"github.com/uptrace/bun/driver/sqliteshim"
 )
 
-// BatchSize is the chunk size for Bun bulk inserts. Use for batching rows (messages, members, etc.) before insert.
-const BatchSize = 2000
+const (
+	// BatchSize is the chunk size for Bun bulk inserts. Use for batching rows (messages, members, etc.) before insert.
+	BatchSize = 2000
+	// DBFileName is the SQLite database filename under a data directory (e.g. --output / --data).
+	DBFileName = "slack.db"
+)
 
 // Open opens a SQLite database at path and returns a Bun DB. If path exists it is truncated (re-initialized).
 func Open(path string) (*bun.DB, error) {

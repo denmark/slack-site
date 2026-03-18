@@ -17,16 +17,16 @@ func init() {
 	reindexCmd := &cobra.Command{
 		Use:   "reindex",
 		Short: "Rebuild the Bleve index from an existing database",
-		Long:  "Reads messages from " + DBFileName + " in --data and builds a new " + BleveIndexDir + " index (overwrites existing index).",
+		Long:  "Reads messages from " + db.DBFileName + " in --data and builds a new " + search.IndexDir + " index (overwrites existing index).",
 		RunE:  runReindex,
 	}
-	reindexCmd.Flags().StringVar(&reindexDataDir, "data", "", "Path to directory containing "+DBFileName)
+	reindexCmd.Flags().StringVar(&reindexDataDir, "data", "", "Path to directory containing "+db.DBFileName)
 	_ = reindexCmd.MarkFlagRequired("data")
 	rootCmd.AddCommand(reindexCmd)
 }
 
 func runReindex(cmd *cobra.Command, args []string) error {
-	dbPath := filepath.Join(reindexDataDir, DBFileName)
+	dbPath := filepath.Join(reindexDataDir, db.DBFileName)
 	database, err := db.OpenReadOnly(dbPath)
 	if err != nil {
 		return err

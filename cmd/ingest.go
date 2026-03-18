@@ -28,11 +28,11 @@ func init() {
 	ingestCmd := &cobra.Command{
 		Use:   "ingest",
 		Short: "Ingest a Slack export into SQLite and Bleve",
-		Long:  "Reads a Slack export from --input, creates " + DBFileName + " and " + BleveIndexDir + " in --output.",
+		Long:  "Reads a Slack export from --input, creates " + db.DBFileName + " and " + search.IndexDir + " in --output.",
 		RunE:  runIngest,
 	}
 	ingestCmd.Flags().StringVar(&inputDir, "input", "", "Path to Slack export directory (e.g. .../chairish-slack)")
-	ingestCmd.Flags().StringVar(&outputDir, "output", "", "Path to output directory ("+DBFileName+" and "+BleveIndexDir+" will be created here)")
+	ingestCmd.Flags().StringVar(&outputDir, "output", "", "Path to output directory ("+db.DBFileName+" and "+search.IndexDir+" will be created here)")
 	_ = ingestCmd.MarkFlagRequired("input")
 	_ = ingestCmd.MarkFlagRequired("output")
 	rootCmd.AddCommand(ingestCmd)
@@ -48,7 +48,7 @@ func runIngest(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("create output dir: %w", err)
 	}
 
-	dbPath := filepath.Join(outputDir, DBFileName)
+	dbPath := filepath.Join(outputDir, db.DBFileName)
 	database, err := db.Open(dbPath)
 	if err != nil {
 		return err
@@ -84,7 +84,7 @@ func runIngest(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("ingest messages: %w", err)
 	}
 
-	fmt.Println("Ingest complete:", DBFileName, "and", BleveIndexDir, "created in", outputDir)
+	fmt.Println("Ingest complete:", db.DBFileName, "and", search.IndexDir, "created in", outputDir)
 	return nil
 }
 

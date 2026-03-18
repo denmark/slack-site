@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	indexDir = "slack.bleve"
+	// IndexDir is the Bleve index directory name under a data directory (e.g. --output / --data).
+	IndexDir = "slack.bleve"
 	// MessageIndexBatchSize is the number of message documents to send to Bleve per batch (recommended 100-1000).
 	// Used by ingest and reindex for consistent index batch sizing.
 	MessageIndexBatchSize = 500
@@ -19,7 +20,7 @@ const (
 
 // IndexPath returns the Bleve index path under outputDir.
 func IndexPath(outputDir string) string {
-	return filepath.Join(outputDir, indexDir)
+	return filepath.Join(outputDir, IndexDir)
 }
 
 // NewIndex creates a new Bleve index at outputDir/slack.bleve. Removes existing index at that path.
