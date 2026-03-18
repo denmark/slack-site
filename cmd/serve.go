@@ -24,17 +24,17 @@ func init() {
 	serveCmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Serve the ingested Slack export in a browser",
-		Long:  "Starts an HTTP server and opens the browser. Requires --data pointing to a directory containing slack.db and slack.bleve (from ingest --output).",
+		Long:  "Starts an HTTP server and opens the browser. Requires --data pointing to a directory containing " + DBFileName + " and " + BleveIndexDir + " (from ingest --output).",
 		RunE:  runServe,
 	}
-	serveCmd.Flags().StringVar(&serveDataDir, "data", "", "Path to directory containing slack.db and slack.bleve (ingest output)")
+	serveCmd.Flags().StringVar(&serveDataDir, "data", "", "Path to directory containing "+DBFileName+" and "+BleveIndexDir+" (ingest output)")
 	serveCmd.Flags().StringVar(&serveAddr, "addr", ":8080", "Listen address (e.g. :8080 or localhost:8080)")
 	_ = serveCmd.MarkFlagRequired("data")
 	rootCmd.AddCommand(serveCmd)
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
-	dbPath := filepath.Join(serveDataDir, "slack.db")
+	dbPath := filepath.Join(serveDataDir, DBFileName)
 	database, err := db.OpenReadOnly(dbPath)
 	if err != nil {
 		return err

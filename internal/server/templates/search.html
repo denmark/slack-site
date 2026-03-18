@@ -15,7 +15,10 @@
       <a href="/{{.ConversationType}}s/{{.ConversationID}}" class="text-sky-600 hover:underline">{{.ConversationID}}</a>
     </div>
     <div class="text-slate-800">{{safeHTML .Snippet}}</div>
-    <a href="/{{.ConversationType}}s/{{.ConversationID}}" class="text-sm text-sky-600 hover:underline mt-2 inline-block">View conversation</a>
+    <div class="flex items-center justify-between mt-2">
+      <a href="/{{.ConversationType}}s/{{.ConversationID}}" class="text-sm text-sky-600 hover:underline">View conversation</a>
+      <div class="text-xs text-slate-400">msg:{{.ConversationType}}/{{.ConversationID}} ts:{{.Ts}}</div>
+    </div>
   </div>
   {{end}}
 </div>

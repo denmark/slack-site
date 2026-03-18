@@ -10,7 +10,12 @@ import (
 	"github.com/denmark/slack-site/models"
 )
 
-const indexDir = "slack.bleve"
+const (
+	indexDir = "slack.bleve"
+	// MessageIndexBatchSize is the number of message documents to send to Bleve per batch (recommended 100-1000).
+	// Used by ingest and reindex for consistent index batch sizing.
+	MessageIndexBatchSize = 500
+)
 
 // IndexPath returns the Bleve index path under outputDir.
 func IndexPath(outputDir string) string {
@@ -46,9 +51,7 @@ func slackIndexMapping() *mapping.IndexMappingImpl {
 	textField.Analyzer = "en"
 	docMapping.AddFieldMappingsAt("id", textField)
 	docMapping.AddFieldMappingsAt("conversation_id", textField)
-	docMapping.AddFieldMappingsAt("conversation_type", textField)
 	docMapping.AddFieldMappingsAt("user_id", textField)
-	docMapping.AddFieldMappingsAt("type", textField)
 	docMapping.AddFieldMappingsAt("ts", textField)
 	docMapping.AddFieldMappingsAt("text", textField)
 	docMapping.AddFieldMappingsAt("team", textField)
@@ -61,29 +64,34 @@ func slackIndexMapping() *mapping.IndexMappingImpl {
 
 // SearchDocumentForMessage returns a search document for a message (for batch or single index).
 // text is the message body to index (e.g. HTML-rendered from rich_text blocks or plain msg.Text).
-func SearchDocumentForMessage(conversationID, conversationType, ts string, msg *models.Message, text string) *models.SearchDocument {
+func SearchDocumentForMessage(conversationID, ts string, msg *models.Message, text string) *models.SearchDocument {
 	name := ""
 	if msg.UserProfile != nil {
 		name = msg.UserProfile.Name
 	}
 	return &models.SearchDocument{
-		ID:               conversationID + "_" + ts,
-		ConversationID:   conversationID,
-		ConversationType: conversationType,
-		UserID:           msg.User,
-		Type:             msg.Type,
-		Ts:               msg.Ts,
-		Text:             text,
-		UserProfileName:  name,
-		Team:             msg.Team,
+		ID:              conversationID + "_" + ts,
+		ConversationID:  conversationID,
+		UserID:          msg.User,
+		Ts:              msg.Ts,
+		Text:            text,
+		UserProfileName: name,
+		Team:            msg.Team,
 	}
 }
 
-// IndexMessage indexes a single message document. text is the message body (e.g. HTML-rendered).
-// func IndexMessage(idx bleve.Index, conversationID, conversationType, ts string, msg *models.Message, text string) error {
-// 	doc := SearchDocumentForMessage(conversationID, conversationType, ts, msg, text)
-// 	return idx.Index(doc.ID, doc)
-// }
+// SearchDocumentForMessageRow returns a search document from a database MessageRow (for reindexing from DB).
+func SearchDocumentForMessageRow(row *models.MessageRow) *models.SearchDocument {
+	return &models.SearchDocument{
+		ID:              row.ConversationID + "_" + row.Ts,
+		ConversationID:  row.ConversationID,
+		UserID:          row.UserID,
+		Ts:              row.Ts,
+		Text:            row.Text,
+		UserProfileName: row.UserProfileName,
+		Team:            row.Team,
+	}
+}
 
 // BatchIndexMessages indexes multiple message documents in one batch (much faster than IndexMessage per doc).
 func BatchIndexMessages(idx bleve.Index, docs []*models.SearchDocument) error {
