@@ -80,10 +80,10 @@ func SearchDocumentForMessage(conversationID, conversationType, ts string, msg *
 }
 
 // IndexMessage indexes a single message document. text is the message body (e.g. HTML-rendered).
-func IndexMessage(idx bleve.Index, conversationID, conversationType, ts string, msg *models.Message, text string) error {
-	doc := SearchDocumentForMessage(conversationID, conversationType, ts, msg, text)
-	return idx.Index(doc.ID, doc)
-}
+// func IndexMessage(idx bleve.Index, conversationID, conversationType, ts string, msg *models.Message, text string) error {
+// 	doc := SearchDocumentForMessage(conversationID, conversationType, ts, msg, text)
+// 	return idx.Index(doc.ID, doc)
+// }
 
 // BatchIndexMessages indexes multiple message documents in one batch (much faster than IndexMessage per doc).
 func BatchIndexMessages(idx bleve.Index, docs []*models.SearchDocument) error {
@@ -100,11 +100,11 @@ func BatchIndexMessages(idx bleve.Index, docs []*models.SearchDocument) error {
 // IndexUser indexes a user for search (optional; plan says "index of all of the data" and "name field of user_profile" - we index messages with user_profile.name; can also index users by name).
 func IndexUser(idx bleve.Index, u *models.User) error {
 	doc := map[string]interface{}{
-		"id":       u.ID,
-		"name":     u.Name,
-		"real_name": u.Profile.RealName,
+		"id":           u.ID,
+		"name":         u.Name,
+		"real_name":    u.Profile.RealName,
 		"display_name": u.Profile.DisplayName,
-		"email":    u.Profile.Email,
+		"email":        u.Profile.Email,
 	}
 	return idx.Index("user_"+u.ID, doc)
 }
