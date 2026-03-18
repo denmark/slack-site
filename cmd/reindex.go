@@ -13,22 +13,20 @@ import (
 
 var reindexDataDir string
 
-const reindexBatchSize = 500
-
 func init() {
 	reindexCmd := &cobra.Command{
 		Use:   "reindex",
 		Short: "Rebuild the Bleve index from an existing database",
-		Long:  "Reads messages from slack.db in --data and builds a new slack.bleve index (overwrites existing index).",
+		Long:  "Reads messages from " + DBFileName + " in --data and builds a new " + BleveIndexDir + " index (overwrites existing index).",
 		RunE:  runReindex,
 	}
-	reindexCmd.Flags().StringVar(&reindexDataDir, "data", "", "Path to directory containing slack.db")
+	reindexCmd.Flags().StringVar(&reindexDataDir, "data", "", "Path to directory containing "+DBFileName)
 	_ = reindexCmd.MarkFlagRequired("data")
 	rootCmd.AddCommand(reindexCmd)
 }
 
 func runReindex(cmd *cobra.Command, args []string) error {
-	dbPath := filepath.Join(reindexDataDir, "slack.db")
+	dbPath := filepath.Join(reindexDataDir, DBFileName)
 	database, err := db.OpenReadOnly(dbPath)
 	if err != nil {
 		return err
@@ -50,7 +48,7 @@ func runReindex(cmd *cobra.Command, args []string) error {
 		q := database.NewSelect().Model(&batch).
 			Column("conversation_id", "conversation_type", "user_id", "type", "ts", "text", "user_profile_name", "team").
 			Order("conversation_id", "ts").
-			Limit(reindexBatchSize)
+			Limit(search.MessageIndexBatchSize)
 		if lastConvID != "" || lastTs != "" {
 			// Keyset pagination: (conversation_id, ts) > (last, last) uses the unique index, O(1) seek per batch
 			q = q.Where("(conversation_id, ts) > (?, ?)", lastConvID, lastTs)
@@ -75,7 +73,7 @@ func runReindex(cmd *cobra.Command, args []string) error {
 		}
 		lastConvID = batch[len(batch)-1].ConversationID
 		lastTs = batch[len(batch)-1].Ts
-		if len(batch) < reindexBatchSize {
+		if len(batch) < search.MessageIndexBatchSize {
 			break
 		}
 	}

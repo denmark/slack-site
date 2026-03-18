@@ -17,13 +17,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// TODO: re-factor these to a common place
-// TODO: make slack.db and slack.bleve into common constants
-const (
-	dbBatchSize       = 2000  // Bun bulk insert chunk size
-	bleveBatchSize    = 500   // Bleve batch index size (recommended 100-1000)
-	messageProgressAt = 50000 // Print message progress every N messages
-)
+const messageProgressAt = 50000 // Print message progress every N messages
 
 var (
 	inputDir  string
@@ -34,11 +28,11 @@ func init() {
 	ingestCmd := &cobra.Command{
 		Use:   "ingest",
 		Short: "Ingest a Slack export into SQLite and Bleve",
-		Long:  "Reads a Slack export from --input, creates slack.db and slack.bleve in --output.",
+		Long:  "Reads a Slack export from --input, creates " + DBFileName + " and " + BleveIndexDir + " in --output.",
 		RunE:  runIngest,
 	}
 	ingestCmd.Flags().StringVar(&inputDir, "input", "", "Path to Slack export directory (e.g. .../chairish-slack)")
-	ingestCmd.Flags().StringVar(&outputDir, "output", "", "Path to output directory (slack.db and slack.bleve will be created here)")
+	ingestCmd.Flags().StringVar(&outputDir, "output", "", "Path to output directory ("+DBFileName+" and "+BleveIndexDir+" will be created here)")
 	_ = ingestCmd.MarkFlagRequired("input")
 	_ = ingestCmd.MarkFlagRequired("output")
 	rootCmd.AddCommand(ingestCmd)
@@ -54,7 +48,7 @@ func runIngest(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("create output dir: %w", err)
 	}
 
-	dbPath := filepath.Join(outputDir, "slack.db")
+	dbPath := filepath.Join(outputDir, DBFileName)
 	database, err := db.Open(dbPath)
 	if err != nil {
 		return err
@@ -90,7 +84,7 @@ func runIngest(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("ingest messages: %w", err)
 	}
 
-	fmt.Println("Ingest complete: slack.db and slack.bleve created in", outputDir)
+	fmt.Println("Ingest complete:", DBFileName, "and", BleveIndexDir, "created in", outputDir)
 	return nil
 }
 
@@ -165,8 +159,8 @@ func ingestChannels(ctx context.Context, database *bun.DB, inputDir string, conv
 	if _, err := database.NewInsert().Model(&rows).Exec(ctx); err != nil {
 		return err
 	}
-	for i := 0; i < len(members); i += dbBatchSize {
-		end := i + dbBatchSize
+	for i := 0; i < len(members); i += db.BatchSize {
+		end := i + db.BatchSize
 		if end > len(members) {
 			end = len(members)
 		}
@@ -209,8 +203,8 @@ func ingestGroups(ctx context.Context, database *bun.DB, inputDir string, convMa
 	if _, err := database.NewInsert().Model(&rows).Exec(ctx); err != nil {
 		return err
 	}
-	for i := 0; i < len(members); i += dbBatchSize {
-		end := i + dbBatchSize
+	for i := 0; i < len(members); i += db.BatchSize {
+		end := i + db.BatchSize
 		if end > len(members) {
 			end = len(members)
 		}
@@ -240,8 +234,8 @@ func ingestDMs(ctx context.Context, database *bun.DB, inputDir string, convMap m
 	if _, err := database.NewInsert().Model(&rows).Exec(ctx); err != nil {
 		return err
 	}
-	for i := 0; i < len(members); i += dbBatchSize {
-		end := i + dbBatchSize
+	for i := 0; i < len(members); i += db.BatchSize {
+		end := i + db.BatchSize
 		if end > len(members) {
 			end = len(members)
 		}
@@ -284,8 +278,8 @@ func ingestMPIMs(ctx context.Context, database *bun.DB, inputDir string, convMap
 	if _, err := database.NewInsert().Model(&rows).Exec(ctx); err != nil {
 		return err
 	}
-	for i := 0; i < len(members); i += dbBatchSize {
-		end := i + dbBatchSize
+	for i := 0; i < len(members); i += db.BatchSize {
+		end := i + db.BatchSize
 		if end > len(members) {
 			end = len(members)
 		}
@@ -299,10 +293,10 @@ func ingestMPIMs(ctx context.Context, database *bun.DB, inputDir string, convMap
 }
 
 func ingestMessages(ctx context.Context, database *bun.DB, idx bleve.Index, inputDir string, convMap map[string]convInfo) error {
-	messageRows := make([]models.MessageRow, 0, dbBatchSize)
-	searchDocs := make([]*models.SearchDocument, 0, bleveBatchSize)
-	fileRows := make([]models.MessageFileRow, 0, dbBatchSize)
-	attachmentRows := make([]models.MessageAttachmentRow, 0, dbBatchSize)
+	messageRows := make([]models.MessageRow, 0, db.BatchSize)
+	searchDocs := make([]*models.SearchDocument, 0, search.MessageIndexBatchSize)
+	fileRows := make([]models.MessageFileRow, 0, db.BatchSize)
+	attachmentRows := make([]models.MessageAttachmentRow, 0, db.BatchSize)
 	var totalMessages, totalFiles, totalAttachments int64
 
 	flushMessages := func() error {
@@ -411,17 +405,17 @@ func ingestMessages(ctx context.Context, database *bun.DB, idx bleve.Index, inpu
 						Pretext:               a.Pretext,
 					})
 				}
-				if len(messageRows) >= dbBatchSize {
+				if len(messageRows) >= db.BatchSize {
 					if err := flushMessages(); err != nil {
 						return err
 					}
 					// Print progress every messageProgressAt messages (e.g. 50k)
-					if totalMessages > 0 && totalMessages%messageProgressAt < int64(dbBatchSize) {
+					if totalMessages > 0 && totalMessages%messageProgressAt < int64(db.BatchSize) {
 						fmt.Printf("  messages: %d...\n", totalMessages)
 					}
 					// Flush Bleve in smaller chunks (recommended 100-1000)
-					for i := 0; i < len(searchDocs); i += bleveBatchSize {
-						end := i + bleveBatchSize
+					for i := 0; i < len(searchDocs); i += search.MessageIndexBatchSize {
+						end := i + search.MessageIndexBatchSize
 						if end > len(searchDocs) {
 							end = len(searchDocs)
 						}

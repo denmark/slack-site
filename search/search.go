@@ -10,7 +10,12 @@ import (
 	"github.com/denmark/slack-site/models"
 )
 
-const indexDir = "slack.bleve"
+const (
+	indexDir = "slack.bleve"
+	// MessageIndexBatchSize is the number of message documents to send to Bleve per batch (recommended 100-1000).
+	// Used by ingest and reindex for consistent index batch sizing.
+	MessageIndexBatchSize = 500
+)
 
 // IndexPath returns the Bleve index path under outputDir.
 func IndexPath(outputDir string) string {
