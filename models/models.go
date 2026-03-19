@@ -260,6 +260,13 @@ type MessageFileRow struct {
 	Size                  int64  `bun:"size"`
 }
 
+// MirroredFileRow records a successfully mirrored file for re-entrancy. Primary key (mirror_root, url_private).
+type MirroredFileRow struct {
+	bun.BaseModel `bun:"table:mirrored_files"`
+	MirrorRoot   string `bun:"mirror_root,pk"`
+	URLPrivate   string `bun:"url_private,pk"`
+}
+
 // MessageAttachmentRow stores an attachment on a message. Foreign key: (message_conversation_id, message_ts) references messages(conversation_id, ts).
 // Stores the attachment "text" and "pretext" from the JSON. Position is the 0-based index in the message's attachments array (for deduplication).
 type MessageAttachmentRow struct {

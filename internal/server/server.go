@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/v2"
+	"github.com/denmark/slack-site/internal/urlpath"
 	"github.com/denmark/slack-site/models"
 	"github.com/denmark/slack-site/search"
 	"github.com/uptrace/bun"
@@ -35,16 +36,26 @@ type SearchHit struct {
 	UserName         string
 }
 
+// messageFileView is used when rendering; URLPrivate may be overridden to mirror base + path when MirrorBaseURL is set.
+type messageFileView struct {
+	URLPrivate string
+	Name       string
+	Mimetype   string
+}
+
 // Server holds the HTTP server dependencies.
 type Server struct {
-	DB    *bun.DB
-	Index bleve.Index
-	tmpl  *template.Template
+	DB             *bun.DB
+	Index          bleve.Index
+	tmpl           *template.Template
+	MirrorBaseURL  string // if set, message file links use this base + computed path from url_private
 }
 
 // New creates a Server and parses templates from the given dir, or from embedded FS if templateDir is empty.
-func New(db *bun.DB, idx bleve.Index, templateDir string) (*Server, error) {
-	s := &Server{DB: db, Index: idx}
+// mirrorBaseURL is optional; when set, conversation file links use base URL + path derived from url_private.
+func New(db *bun.DB, idx bleve.Index, templateDir string, mirrorBaseURL string) (*Server, error) {
+	mirrorBaseURL = strings.TrimSuffix(mirrorBaseURL, "/")
+	s := &Server{DB: db, Index: idx, MirrorBaseURL: mirrorBaseURL}
 	funcs := template.FuncMap{
 		"safeHTML":     func(s string) template.HTML { return template.HTML(s) },
 		"formatTs":     formatTs,
@@ -269,7 +280,7 @@ func (s *Server) handleConversation(convType string) http.HandlerFunc {
 			nextAfter = messages[len(messages)-1].Ts
 		}
 		// Load message_files for this page of messages (conversation_id, message_ts)
-		messageFiles := make(map[string][]models.MessageFileRow)
+		messageFiles := make(map[string][]messageFileView)
 		if len(messages) > 0 {
 			tsList := make([]string, 0, len(messages))
 			for _, m := range messages {
@@ -281,7 +292,13 @@ func (s *Server) handleConversation(convType string) http.HandlerFunc {
 				Scan(ctx)
 			if err == nil {
 				for _, f := range files {
-					messageFiles[f.MessageTs] = append(messageFiles[f.MessageTs], f)
+					view := messageFileView{URLPrivate: f.URLPrivate, Name: f.Name, Mimetype: f.Mimetype}
+					if s.MirrorBaseURL != "" && f.URLPrivate != "" {
+						if path, pathErr := urlpath.RelativePath(f.URLPrivate, f.Name); pathErr == nil {
+							view.URLPrivate = s.MirrorBaseURL + "/" + path
+						}
+					}
+					messageFiles[f.MessageTs] = append(messageFiles[f.MessageTs], view)
 				}
 			}
 		}

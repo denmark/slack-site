@@ -49,6 +49,34 @@ func OpenReadOnly(path string) (*bun.DB, error) {
 	return bun.NewDB(sqldb, sqlitedialect.New()), nil
 }
 
+// OpenReadWrite opens an existing SQLite database at path for read-write access without truncating. The file must already exist.
+// It ensures the mirrored_files table exists (for mirror-files sub-command state).
+func OpenReadWrite(path string) (*bun.DB, error) {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("database not found: %s (run ingest first)", path)
+		}
+		return nil, fmt.Errorf("stat database: %w", err)
+	}
+	sqldb, err := sql.Open(sqliteshim.ShimName, "file:"+path+"?cache=shared&mode=rwc")
+	if err != nil {
+		return nil, fmt.Errorf("sql open: %w", err)
+	}
+	db := bun.NewDB(sqldb, sqlitedialect.New())
+	if err := ensureMirroredFilesTable(db); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("ensure mirrored_files table: %w", err)
+	}
+	return db, nil
+}
+
+// ensureMirroredFilesTable creates the mirrored_files table if it does not exist (for mirror-files re-entrancy state).
+func ensureMirroredFilesTable(db *bun.DB) error {
+	ctx := context.Background()
+	_, err := db.NewCreateTable().Model((*models.MirroredFileRow)(nil)).IfNotExists().Exec(ctx)
+	return err
+}
+
 func createSchema(db *bun.DB) error {
 	ctx := context.Background()
 	// Create tables in dependency order
