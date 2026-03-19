@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -47,6 +48,27 @@ func init() {
 	_ = mirrorCmd.MarkFlagRequired("data")
 	_ = mirrorCmd.MarkFlagRequired("mirror")
 	rootCmd.AddCommand(mirrorCmd)
+}
+
+// progressFieldWidth returns the number of decimal digits needed to display n (minimum 1).
+func progressFieldWidth(n int) int {
+	if n < 1 {
+		return 1
+	}
+	w := 0
+	for t := n; t > 0; t /= 10 {
+		w++
+	}
+	return w
+}
+
+// formatProgressBracket returns "[00042] " with seq zero-padded to width digits.
+func formatProgressBracket(seq int64, width int) string {
+	s := strconv.FormatInt(seq, 10)
+	if len(s) < width {
+		s = strings.Repeat("0", width-len(s)) + s
+	}
+	return "[" + s + "] "
 }
 
 func runMirror(cmd *cobra.Command, args []string) error {
@@ -99,6 +121,8 @@ func runMirror(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("select message_files: %w", err)
 	}
+	progressWidth := progressFieldWidth(len(files))
+	var progressSeq int64
 
 	type work struct {
 		urlPrivate string
@@ -115,19 +139,22 @@ func runMirror(cmd *cobra.Command, args []string) error {
 			for w := range workCh {
 				relPath, pathErr := urlpath.RelativePath(w.urlPrivate, w.name)
 				if pathErr != nil {
-					fmt.Printf("skip %s: %v\n", w.urlPrivate, pathErr)
+					n := atomic.AddInt64(&progressSeq, 1)
+					fmt.Printf("%sskip %s: %v\n", formatProgressBracket(n, progressWidth), w.urlPrivate, pathErr)
 					atomic.AddInt64(&skipped, 1)
 					continue
 				}
 				if mirrorDryRun {
-					fmt.Printf("would mirror -> %s\n", relPath)
+					n := atomic.AddInt64(&progressSeq, 1)
+					fmt.Printf("%swould mirror -> %s\n", formatProgressBracket(n, progressWidth), relPath)
 					atomic.AddInt64(&mirrored, 1)
 					continue
 				}
 				// Download
 				req, err := http.NewRequestWithContext(ctx, http.MethodGet, w.urlPrivate, nil)
 				if err != nil {
-					fmt.Printf("skip %s: %v\n", relPath, err)
+					n := atomic.AddInt64(&progressSeq, 1)
+					fmt.Printf("%sskip %s: %v\n", formatProgressBracket(n, progressWidth), relPath, err)
 					atomic.AddInt64(&skipped, 1)
 					continue
 				}
@@ -136,13 +163,15 @@ func runMirror(cmd *cobra.Command, args []string) error {
 				// }
 				resp, err := http.DefaultClient.Do(req)
 				if err != nil {
-					fmt.Printf("skip %s: %v\n", relPath, err)
+					n := atomic.AddInt64(&progressSeq, 1)
+					fmt.Printf("%sskip %s: %v\n", formatProgressBracket(n, progressWidth), relPath, err)
 					atomic.AddInt64(&skipped, 1)
 					continue
 				}
 				if resp.StatusCode != http.StatusOK {
 					resp.Body.Close()
-					fmt.Printf("skip %s: HTTP %d\n", relPath, resp.StatusCode)
+					n := atomic.AddInt64(&progressSeq, 1)
+					fmt.Printf("%sskip %s: HTTP %d\n", formatProgressBracket(n, progressWidth), relPath, resp.StatusCode)
 					atomic.AddInt64(&skipped, 1)
 					continue
 				}
@@ -153,7 +182,8 @@ func runMirror(cmd *cobra.Command, args []string) error {
 					buf, readErr := io.ReadAll(resp.Body)
 					resp.Body.Close()
 					if readErr != nil {
-						fmt.Printf("skip %s: read: %v\n", relPath, readErr)
+						n := atomic.AddInt64(&progressSeq, 1)
+						fmt.Printf("%sskip %s: read: %v\n", formatProgressBracket(n, progressWidth), relPath, readErr)
 						atomic.AddInt64(&skipped, 1)
 						continue
 					}
@@ -167,15 +197,17 @@ func runMirror(cmd *cobra.Command, args []string) error {
 					resp.Body.Close()
 				}
 				if err != nil {
-					fmt.Printf("skip %s: write: %v\n", relPath, err)
+					n := atomic.AddInt64(&progressSeq, 1)
+					fmt.Printf("%sskip %s: write: %v\n", formatProgressBracket(n, progressWidth), relPath, err)
 					atomic.AddInt64(&skipped, 1)
 					continue
 				}
-				_, err = database.NewInsert().Model(&models.MirroredFileRow{MirrorRoot: mirrorRoot, URLPrivate: w.urlPrivate}).Exec(ctx)
+				_, err = database.NewInsert().Model(&models.MirroredFileRow{MirrorRoot: mirrorRoot, URLPrivate: w.urlPrivate, StoredPath: relPath}).Exec(ctx)
 				if err != nil {
 					log.Printf("warning: inserted file but DB record failed %q: %v", w.urlPrivate, err)
 				}
-				fmt.Printf("mirrored -> %s\n", relPath)
+				n := atomic.AddInt64(&progressSeq, 1)
+				fmt.Printf("%smirrored -> %s\n", formatProgressBracket(n, progressWidth), relPath)
 				atomic.AddInt64(&mirrored, 1)
 			}
 		}()
@@ -184,7 +216,8 @@ func runMirror(cmd *cobra.Command, args []string) error {
 	// Producer: check mirrored_files and send work
 	for _, f := range files {
 		if f.URLPrivate == "" {
-			fmt.Printf("skip (empty url)\n")
+			n := atomic.AddInt64(&progressSeq, 1)
+			fmt.Printf("%sskip (empty url)\n", formatProgressBracket(n, progressWidth))
 			atomic.AddInt64(&skipped, 1)
 			continue
 		}
@@ -193,11 +226,12 @@ func runMirror(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("check mirrored_files: %w", err)
 		}
 		if exists {
+			n := atomic.AddInt64(&progressSeq, 1)
 			relPath, _ := urlpath.RelativePath(f.URLPrivate, f.Name)
 			if relPath != "" {
-				fmt.Printf("skip (already mirrored) %s\n", relPath)
+				fmt.Printf("%sskip (already mirrored) %s\n", formatProgressBracket(n, progressWidth), relPath)
 			} else {
-				fmt.Printf("skip (already mirrored) %s\n", f.URLPrivate)
+				fmt.Printf("%sskip (already mirrored) %s\n", formatProgressBracket(n, progressWidth), f.URLPrivate)
 			}
 			atomic.AddInt64(&skipped, 1)
 			continue
