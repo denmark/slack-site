@@ -11,8 +11,9 @@ import (
 )
 
 // PathFromURL computes the mirror path components from url_private. Returns the first three
-// characters of the SHA256 hex hash (a, b, c) and a sanitized filename. fallbackName is used
-// when the URL has no path segment or the segment is empty or ".".
+// characters of the SHA256 hex hash (a, b, c) and a filename of the form "<fullhash>_<base>"
+// so the path is unique and collision-free. fallbackName is used when the URL has no path
+// segment or the segment is empty or ".".
 func PathFromURL(urlPrivate string, fallbackName string) (a, b, c, filename string, err error) {
 	if urlPrivate == "" {
 		return "", "", "", "", fmt.Errorf("url_private is empty")
@@ -38,11 +39,11 @@ func PathFromURL(urlPrivate string, fallbackName string) (a, b, c, filename stri
 			base = "file"
 		}
 	}
-	filename = SanitizeFilename(base)
+	filename = hexHash + "_" + SanitizeFilename(base)
 	return a, b, c, filename, nil
 }
 
-// RelativePath returns the relative path "a/b/c/filename" for the given url_private, using
+// RelativePath returns the relative path "a/b/c/<hash>_filename" for the given url_private, using
 // fallbackName when the URL has no usable path segment.
 func RelativePath(urlPrivate string, fallbackName string) (string, error) {
 	a, b, c, filename, err := PathFromURL(urlPrivate, fallbackName)
