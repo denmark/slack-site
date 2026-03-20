@@ -16,8 +16,9 @@ import (
 )
 
 var (
-	serveDataDir string
-	serveAddr    string
+	serveDataDir   string
+	serveAddr      string
+	serveMirrorBase string
 )
 
 func init() {
@@ -29,6 +30,7 @@ func init() {
 	}
 	serveCmd.Flags().StringVar(&serveDataDir, "data", "", "Path to directory containing "+db.DBFileName+" and "+search.IndexDir+" (ingest output)")
 	serveCmd.Flags().StringVar(&serveAddr, "addr", ":8080", "Listen address (e.g. :8080 or localhost:8080)")
+	serveCmd.Flags().StringVar(&serveMirrorBase, "mirror", "", "Base URL for message file links (e.g. https://cdn.example.com/files); if set, file URLs are base + path from url_private")
 	_ = serveCmd.MarkFlagRequired("data")
 	rootCmd.AddCommand(serveCmd)
 }
@@ -50,7 +52,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		defer search.Close(bleveIdx)
 	}
 
-	srv, err := server.New(database, bleveIdx, "")
+	srv, err := server.New(database, bleveIdx, "", serveMirrorBase)
 	if err != nil {
 		return fmt.Errorf("server: %w", err)
 	}
