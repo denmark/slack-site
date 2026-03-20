@@ -27,8 +27,8 @@ var (
 	mirrorConcurrency int
 	mirrorInit        bool
 	mirrorDryRun      bool
-	// mirrorSlackToken  string
-	mirrorAWSProfile string
+	mirrorSlackToken  string
+	mirrorAWSProfile  string
 )
 
 func init() {
@@ -43,7 +43,7 @@ func init() {
 	mirrorCmd.Flags().IntVar(&mirrorConcurrency, "concurrency", 2, "Number of concurrent download/upload workers")
 	mirrorCmd.Flags().BoolVar(&mirrorInit, "init", false, "Clear mirror state table before running (full re-mirror)")
 	mirrorCmd.Flags().BoolVar(&mirrorDryRun, "dry-run", false, "Only log what would be done; no download, write, or DB updates")
-	// mirrorCmd.Flags().StringVar(&mirrorSlackToken, "slack-token", "", "Slack token for url_private requests (or set SLACK_TOKEN)")
+	mirrorCmd.Flags().StringVar(&mirrorSlackToken, "slack-token", "", "Slack token for url_private requests (or set SLACK_TOKEN)")
 	mirrorCmd.Flags().StringVar(&mirrorAWSProfile, "aws-profile", "", "AWS config profile to use for S3 (e.g. SSO profile name); uses default profile if not set")
 	_ = mirrorCmd.MarkFlagRequired("data")
 	_ = mirrorCmd.MarkFlagRequired("mirror")
@@ -108,11 +108,11 @@ func runMirror(cmd *cobra.Command, args []string) error {
 		}
 		log.Printf("Cleared mirror state for %s", mirrorRoot)
 	}
-	// TODO: remove mirrorSlackToken?
-	// slackToken := mirrorSlackToken
-	// if slackToken == "" {
-	// 	slackToken = os.Getenv("SLACK_TOKEN")
-	// }
+
+	slackToken := mirrorSlackToken
+	if slackToken == "" {
+		slackToken = os.Getenv("SLACK_TOKEN")
+	}
 
 	// Stream message_files and feed rows that are not already mirrored into the worker pool
 	var skipped, mirrored int64
@@ -158,9 +158,9 @@ func runMirror(cmd *cobra.Command, args []string) error {
 					atomic.AddInt64(&skipped, 1)
 					continue
 				}
-				// if slackToken != "" {
-				// 	req.Header.Set("Authorization", "Bearer "+slackToken)
-				// }
+				if slackToken != "" {
+					req.Header.Set("Authorization", "Bearer "+slackToken)
+				}
 				resp, err := http.DefaultClient.Do(req)
 				if err != nil {
 					n := atomic.AddInt64(&progressSeq, 1)
