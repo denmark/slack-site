@@ -7,8 +7,14 @@ import (
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/mapping"
+	blevequery "github.com/blevesearch/bleve/v2/search/query"
 	"github.com/denmark/slack-site/models"
 )
+
+// searchAnalyzer matches slackIndexMapping text fields: unicode tokenizer, lowercase,
+// English stopwords — same as Bleve's "standard" analyzer (no Porter stemming).
+// Stemming would merge "process" and "processing", so a search for one would match the other.
+const searchAnalyzer = "standard"
 
 const (
 	// IndexDir is the Bleve index directory name under a data directory (e.g. --output / --data).
@@ -47,9 +53,9 @@ func slackIndexMapping() *mapping.IndexMappingImpl {
 	idxMapping := bleve.NewIndexMapping()
 	docMapping := bleve.NewDocumentMapping()
 
-	// Text fields
+	// Text fields (use "standard", not "en", so e.g. "processing" and "process" stay distinct tokens).
 	textField := bleve.NewTextFieldMapping()
-	textField.Analyzer = "en"
+	textField.Analyzer = searchAnalyzer
 	docMapping.AddFieldMappingsAt("id", textField)
 	docMapping.AddFieldMappingsAt("conversation_id", textField)
 	docMapping.AddFieldMappingsAt("user_id", textField)
@@ -59,8 +65,39 @@ func slackIndexMapping() *mapping.IndexMappingImpl {
 	// "name" field of user_profile (mapping as specified in plan)
 	docMapping.AddFieldMappingsAt("name", textField)
 
+	// Align default search-time analysis with indexed fields (QueryStringQuery uses _all → default analyzer).
+	idxMapping.DefaultAnalyzer = searchAnalyzer
+
 	idxMapping.DefaultMapping = docMapping
 	return idxMapping
+}
+
+func applySearchAnalyzerToQuery(q blevequery.Query) {
+	if q == nil {
+		return
+	}
+	switch t := q.(type) {
+	case *blevequery.MatchQuery:
+		if t.Analyzer == "" {
+			t.Analyzer = searchAnalyzer
+		}
+	case *blevequery.MatchPhraseQuery:
+		if t.Analyzer == "" {
+			t.Analyzer = searchAnalyzer
+		}
+	case *blevequery.BooleanQuery:
+		applySearchAnalyzerToQuery(t.Must)
+		applySearchAnalyzerToQuery(t.Should)
+		applySearchAnalyzerToQuery(t.MustNot)
+	case *blevequery.ConjunctionQuery:
+		for _, c := range t.Conjuncts {
+			applySearchAnalyzerToQuery(c)
+		}
+	case *blevequery.DisjunctionQuery:
+		for _, c := range t.Disjuncts {
+			applySearchAnalyzerToQuery(c)
+		}
+	}
 }
 
 // SearchDocumentForMessage returns a search document for a message (for batch or single index).
@@ -136,8 +173,13 @@ func SearchWithFields(idx bleve.Index, q string, from, size int, fields []string
 	if idx == nil {
 		return nil, fmt.Errorf("index is nil")
 	}
-	query := bleve.NewQueryStringQuery(q)
-	req := bleve.NewSearchRequestOptions(query, size, from, false)
+	qs := bleve.NewQueryStringQuery(q)
+	parsed, err := qs.Parse()
+	if err != nil {
+		return nil, err
+	}
+	applySearchAnalyzerToQuery(parsed)
+	req := bleve.NewSearchRequestOptions(parsed, size, from, false)
 	if len(fields) > 0 {
 		req.Fields = fields
 	}
