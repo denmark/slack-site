@@ -74,7 +74,10 @@ func OpenReadWrite(path string) (*bun.DB, error) {
 func ensureMirroredFilesTable(db *bun.DB) error {
 	ctx := context.Background()
 	_, err := db.NewCreateTable().Model((*models.MirroredFileRow)(nil)).IfNotExists().Exec(ctx)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func createSchema(db *bun.DB) error {
