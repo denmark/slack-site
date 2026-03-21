@@ -20,21 +20,21 @@ import (
 const messageProgressAt = 50000 // Print message progress every N messages
 
 var (
-	inputDir  string
-	outputDir string
+	inputDir string
+	dataDir  string
 )
 
 func init() {
 	ingestCmd := &cobra.Command{
 		Use:   "ingest",
 		Short: "Ingest a Slack export into SQLite and Bleve",
-		Long:  "Reads a Slack export from --input, creates " + db.DBFileName + " and " + search.IndexDir + " in --output.",
+		Long:  "Reads a Slack export from --input, creates " + db.DBFileName + " and " + search.IndexDir + " in --data.",
 		RunE:  runIngest,
 	}
 	ingestCmd.Flags().StringVar(&inputDir, "input", "", "Path to Slack export directory (e.g. .../chairish-slack)")
-	ingestCmd.Flags().StringVar(&outputDir, "output", "", "Path to output directory ("+db.DBFileName+" and "+search.IndexDir+" will be created here)")
+	ingestCmd.Flags().StringVar(&dataDir, "data", "", "Path to data directory ("+db.DBFileName+" and "+search.IndexDir+" will be created here)")
 	_ = ingestCmd.MarkFlagRequired("input")
-	_ = ingestCmd.MarkFlagRequired("output")
+	_ = ingestCmd.MarkFlagRequired("data")
 	rootCmd.AddCommand(ingestCmd)
 }
 
@@ -44,18 +44,18 @@ type convInfo struct {
 }
 
 func runIngest(cmd *cobra.Command, args []string) error {
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return fmt.Errorf("create output dir: %w", err)
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		return fmt.Errorf("create data dir: %w", err)
 	}
 
-	dbPath := filepath.Join(outputDir, db.DBFileName)
+	dbPath := filepath.Join(dataDir, db.DBFileName)
 	database, err := db.Open(dbPath)
 	if err != nil {
 		return err
 	}
 	defer database.Close()
 
-	bleveIdx, err := search.NewIndex(outputDir)
+	bleveIdx, err := search.NewIndex(dataDir)
 	if err != nil {
 		return fmt.Errorf("create bleve index: %w", err)
 	}
@@ -84,7 +84,7 @@ func runIngest(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("ingest messages: %w", err)
 	}
 
-	fmt.Println("Ingest complete:", db.DBFileName, "and", search.IndexDir, "created in", outputDir)
+	fmt.Println("Ingest complete:", db.DBFileName, "and", search.IndexDir, "created in", dataDir)
 	return nil
 }
 

@@ -15,7 +15,7 @@ import (
 const (
 	// BatchSize is the chunk size for Bun bulk inserts. Use for batching rows (messages, members, etc.) before insert.
 	BatchSize = 2000
-	// DBFileName is the SQLite database filename under a data directory (e.g. --output / --data).
+	// DBFileName is the SQLite database filename under a data directory (e.g. ingest/serve --data).
 	DBFileName = "slack.db"
 )
 

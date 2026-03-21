@@ -17,7 +17,7 @@ import (
 const searchAnalyzer = "standard"
 
 const (
-	// IndexDir is the Bleve index directory name under a data directory (e.g. --output / --data).
+	// IndexDir is the Bleve index directory name under a data directory (e.g. ingest/serve --data).
 	IndexDir = "slack.bleve"
 	// MessageIndexBatchSize is the number of message documents to send to Bleve per batch (recommended 100-1000).
 	// Used by ingest and reindex for consistent index batch sizing.

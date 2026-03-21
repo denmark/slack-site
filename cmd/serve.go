@@ -25,10 +25,10 @@ func init() {
 	serveCmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Serve the ingested Slack export in a browser",
-		Long:  "Starts an HTTP server and opens the browser. Requires --data pointing to a directory containing " + db.DBFileName + " and " + search.IndexDir + " (from ingest --output).",
+		Long:  "Starts an HTTP server and opens the browser. Requires --data pointing to a directory containing " + db.DBFileName + " and " + search.IndexDir + " (same as ingest --data).",
 		RunE:  runServe,
 	}
-	serveCmd.Flags().StringVar(&serveDataDir, "data", "", "Path to directory containing "+db.DBFileName+" and "+search.IndexDir+" (ingest output)")
+	serveCmd.Flags().StringVar(&serveDataDir, "data", "", "Path to directory containing "+db.DBFileName+" and "+search.IndexDir+" (same directory as ingest --data)")
 	serveCmd.Flags().StringVar(&serveAddr, "addr", ":8080", "Listen address (e.g. :8080 or localhost:8080)")
 	serveCmd.Flags().StringVar(&serveMirrorBase, "mirror", "", "Base URL for message file links (e.g. https://cdn.example.com/files); if set, file URLs are base + path from url_private")
 	_ = serveCmd.MarkFlagRequired("data")

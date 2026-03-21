@@ -37,10 +37,10 @@ The binary is named `slack-site` in the current directory.
 
 1. Obtain a Slack export ZIP, unzip it, and note the path to the folder that contains `users.json` (and channel directories).
 
-2. **Ingest** into an output directory (created if needed). This **overwrites** any existing `slack.db` and `slack.bleve` in that directory.
+2. **Ingest** into a data directory (created if needed). This **overwrites** any existing `slack.db` and `slack.bleve` in that directory.
 
    ```bash
-   ./slack-site ingest --input /path/to/slack/export --output ./data
+   ./slack-site ingest --input /path/to/slack/export --data ./data
    ```
 
 3. **Serve** the site (opens your default browser on macOS, Windows, and typical Linux desktops):
@@ -75,27 +75,27 @@ Reads the export and writes:
 - **`slack.bleve`** — Bleve index for search (message text as stored after HTML rendering from blocks).
 
 ```text
-slack-site ingest --input <export-dir> --output <output-dir>
+slack-site ingest --input <export-dir> --data <data-dir>
 ```
 
 | Flag | Required | Description |
 |------|----------|-------------|
 | `--input` | Yes | Path to the Slack export root (contains `users.json`). |
-| `--output` | Yes | Directory where `slack.db` and `slack.bleve` are created. |
+| `--data` | Yes | Directory where `slack.db` and `slack.bleve` are created. |
 
-**Note:** Existing `slack.db` at `output/slack.db` is removed and recreated. The Bleve directory under `output` is replaced.
+**Note:** Existing `slack.db` at `<data-dir>/slack.db` is removed and recreated. The Bleve directory under `<data-dir>` is replaced.
 
 ### `serve`
 
 Serves the ingested data over HTTP using embedded HTML templates.
 
 ```text
-slack-site serve --data <output-dir> [--addr <listen>] [--mirror <base-url>]
+slack-site serve --data <data-dir> [--addr <listen>] [--mirror <base-url>]
 ```
 
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--data` | Yes | Directory that contains `slack.db` (from ingest). |
+| `--data` | Yes | Directory that contains `slack.db` (same as **ingest** `--data`). |
 | `--addr` | No | Listen address (default `:8080`). Examples: `localhost:3000`, `127.0.0.1:8080`. |
 | `--mirror` | No | Base URL for message **file** links. When set, each file’s `url_private` is replaced by `base + '/' + relativePath`, where `relativePath` is derived from the URL and filename. Use this after mirroring files to a static host or CDN. **Do not** include a trailing slash (it is trimmed). |
 
@@ -108,7 +108,7 @@ slack-site serve --data <output-dir> [--addr <listen>] [--mirror <base-url>]
 Downloads each distinct `url_private` from the `message_files` table and writes objects under a **mirror root**. Progress is recorded in the **`mirrored_files`** table so runs can be resumed.
 
 ```text
-slack-site mirror-files --data <output-dir> --mirror <destination> [options]
+slack-site mirror-files --data <data-dir> --mirror <destination> [options]
 ```
 
 | Flag | Required | Description |
@@ -157,7 +157,7 @@ Paths are appended without a double slash (the server normalizes the mirror base
 Rebuilds **`slack.bleve`** from **`slack.db`** message rows (overwrites the existing Bleve directory under `--data`). Use this if the database was updated without re-ingesting, or the search index was deleted or corrupted.
 
 ```text
-slack-site reindex --data <output-dir>
+slack-site reindex --data <data-dir>
 ```
 
 | Flag | Required | Description |
@@ -175,7 +175,7 @@ When mirroring to S3, static access keys in the environment may be cleared so th
 
 ## Output layout
 
-After a successful ingest, `--output` (or `--data` for other commands) typically contains:
+After a successful **ingest**, the `--data` directory typically contains:
 
 ```text
 <data-dir>/
