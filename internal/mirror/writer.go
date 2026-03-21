@@ -2,7 +2,10 @@ package mirror
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"maps"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -12,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 // Writer writes file content to a mirror destination (local directory or S3).
@@ -123,10 +127,7 @@ type S3Writer struct {
 
 // Write implements Writer by uploading to s3://Bucket/Prefix/relativePath.
 func (w *S3Writer) Write(ctx context.Context, relativePath string, body io.Reader, contentLength int64, contentType string) error {
-	key := relativePath
-	if w.Prefix != "" {
-		key = w.Prefix + "/" + relativePath
-	}
+	key := w.ObjectKey(relativePath)
 	input := &s3.PutObjectInput{
 		Bucket: aws.String(w.Bucket),
 		Key:    aws.String(key),
@@ -140,6 +141,99 @@ func (w *S3Writer) Write(ctx context.Context, relativePath string, body io.Reade
 	}
 	_, err := w.Client.PutObject(ctx, input)
 	return err
+}
+
+// ObjectKey returns the S3 key for relativePath (same layout as Write and SyncContentType).
+func (w *S3Writer) ObjectKey(relativePath string) string {
+	key := relativePath
+	if w.Prefix != "" {
+		key = w.Prefix + "/" + relativePath
+	}
+	return key
+}
+
+// encodeS3CopySource builds the CopySource value (bucket/key, URL-encoded key) for CopyObject.
+func encodeS3CopySource(bucket, key string) string {
+	return bucket + "/" + strings.ReplaceAll(url.QueryEscape(key), "+", "%20")
+}
+
+// SyncContentType sets the object's Content-Type via in-place CopyObject, preserving metadata
+// from HeadObject. Returns updated=true when CopyObject ran. Returns (false, nil) when the
+// object already has that Content-Type. newContentType must be non-empty after TrimSpace.
+func (w *S3Writer) SyncContentType(ctx context.Context, relativePath, newContentType string) (updated bool, err error) {
+	newContentType = strings.TrimSpace(newContentType)
+	if newContentType == "" {
+		return false, fmt.Errorf("empty content type")
+	}
+	key := w.ObjectKey(relativePath)
+	head, err := w.Client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(w.Bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return false, err
+	}
+	if strings.TrimSpace(aws.ToString(head.ContentType)) == newContentType {
+		return false, nil
+	}
+
+	copyIn := &s3.CopyObjectInput{
+		Bucket:            aws.String(w.Bucket),
+		Key:               aws.String(key),
+		CopySource:        aws.String(encodeS3CopySource(w.Bucket, key)),
+		MetadataDirective: types.MetadataDirectiveReplace,
+		ContentType:       aws.String(newContentType),
+	}
+	if len(head.Metadata) > 0 {
+		copyIn.Metadata = maps.Clone(head.Metadata)
+	}
+	if head.CacheControl != nil {
+		copyIn.CacheControl = head.CacheControl
+	}
+	if head.ContentDisposition != nil {
+		copyIn.ContentDisposition = head.ContentDisposition
+	}
+	if head.ContentEncoding != nil {
+		copyIn.ContentEncoding = head.ContentEncoding
+	}
+	if head.ContentLanguage != nil {
+		copyIn.ContentLanguage = head.ContentLanguage
+	}
+	if es := aws.ToString(head.ExpiresString); es != "" {
+		if t, perr := http.ParseTime(es); perr == nil {
+			copyIn.Expires = &t
+		}
+	}
+	if head.WebsiteRedirectLocation != nil {
+		copyIn.WebsiteRedirectLocation = head.WebsiteRedirectLocation
+	}
+	if head.ServerSideEncryption != "" {
+		copyIn.ServerSideEncryption = head.ServerSideEncryption
+	}
+	if head.SSEKMSKeyId != nil {
+		copyIn.SSEKMSKeyId = head.SSEKMSKeyId
+	}
+	if head.BucketKeyEnabled != nil {
+		copyIn.BucketKeyEnabled = head.BucketKeyEnabled
+	}
+	if head.StorageClass != "" {
+		copyIn.StorageClass = head.StorageClass
+	}
+	if head.ObjectLockLegalHoldStatus != "" {
+		copyIn.ObjectLockLegalHoldStatus = head.ObjectLockLegalHoldStatus
+	}
+	if head.ObjectLockMode != "" {
+		copyIn.ObjectLockMode = head.ObjectLockMode
+	}
+	if head.ObjectLockRetainUntilDate != nil {
+		copyIn.ObjectLockRetainUntilDate = head.ObjectLockRetainUntilDate
+	}
+
+	_, err = w.Client.CopyObject(ctx, copyIn)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 var (
