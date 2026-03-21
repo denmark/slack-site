@@ -18,7 +18,8 @@ import (
 type Writer interface {
 	// Write writes content to the given relative path (e.g. "a/b/c/filename").
 	// contentLength is the body size in bytes; use -1 if unknown (S3 requires a known length and may buffer).
-	Write(ctx context.Context, relativePath string, body io.Reader, contentLength int64) error
+	// contentType is the MIME type from the download response (e.g. Content-Type header); empty means unspecified.
+	Write(ctx context.Context, relativePath string, body io.Reader, contentLength int64, contentType string) error
 }
 
 // ParseMirrorURL parses --mirror and returns a Writer and the normalized mirror root string for the DB.
@@ -105,7 +106,7 @@ type FileWriter struct {
 }
 
 // Write implements Writer by writing to Root/relativePath, creating parent dirs as needed.
-func (w *FileWriter) Write(ctx context.Context, relativePath string, body io.Reader, contentLength int64) error {
+func (w *FileWriter) Write(ctx context.Context, relativePath string, body io.Reader, contentLength int64, contentType string) error {
 	fullPath := filepath.Join(w.Root, filepath.FromSlash(relativePath))
 	if err := mkdirAll(filepath.Dir(fullPath)); err != nil {
 		return err
@@ -121,7 +122,7 @@ type S3Writer struct {
 }
 
 // Write implements Writer by uploading to s3://Bucket/Prefix/relativePath.
-func (w *S3Writer) Write(ctx context.Context, relativePath string, body io.Reader, contentLength int64) error {
+func (w *S3Writer) Write(ctx context.Context, relativePath string, body io.Reader, contentLength int64, contentType string) error {
 	key := relativePath
 	if w.Prefix != "" {
 		key = w.Prefix + "/" + relativePath
@@ -130,6 +131,9 @@ func (w *S3Writer) Write(ctx context.Context, relativePath string, body io.Reade
 		Bucket: aws.String(w.Bucket),
 		Key:    aws.String(key),
 		Body:   body,
+	}
+	if contentType != "" {
+		input.ContentType = aws.String(contentType)
 	}
 	if contentLength >= 0 {
 		input.ContentLength = aws.Int64(contentLength)

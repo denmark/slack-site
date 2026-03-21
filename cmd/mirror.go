@@ -175,6 +175,7 @@ func runMirror(cmd *cobra.Command, args []string) error {
 					atomic.AddInt64(&skipped, 1)
 					continue
 				}
+				contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
 				contentLength := resp.ContentLength
 				var body io.Reader = resp.Body
 				if contentLength < 0 {
@@ -190,7 +191,7 @@ func runMirror(cmd *cobra.Command, args []string) error {
 					body = bytes.NewReader(buf)
 					contentLength = int64(len(buf))
 				}
-				err = writer.Write(ctx, relPath, body, contentLength)
+				err = writer.Write(ctx, relPath, body, contentLength, contentType)
 				if contentLength < 0 {
 					// body was already closed above
 				} else {
